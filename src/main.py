@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from collectors import youtube, reddit, tiktok, google_trends, rss_feeds
+from collectors import youtube, reddit, tiktok, google_trends, rss_feeds, instagram
 from analyzer import analyze
 from notifier import send
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def collect_all() -> dict:
     """全プラットフォームからデータを並列収集."""
-    collected = {"youtube": [], "reddit": [], "tiktok": [], "google_trends": [], "rss_feeds": []}
+    collected = {"youtube": [], "reddit": [], "tiktok": [], "google_trends": [], "rss_feeds": [], "instagram": []}
 
     collectors = {
         "youtube": youtube.collect,
@@ -31,9 +31,10 @@ def collect_all() -> dict:
         "tiktok": tiktok.collect,
         "google_trends": google_trends.collect,
         "rss_feeds": rss_feeds.collect,
+        "instagram": instagram.collect,
     }
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {
             executor.submit(fn): name for name, fn in collectors.items()
         }
@@ -46,12 +47,13 @@ def collect_all() -> dict:
 
     total = sum(len(v) for v in collected.values())
     logger.info(
-        "データ収集完了 — YouTube: %d, Reddit: %d, TikTok: %d, Google Trends: %d, RSS: %d (合計: %d)",
+        "データ収集完了 — YouTube: %d, Reddit: %d, TikTok: %d, Google Trends: %d, RSS: %d, Instagram: %d (合計: %d)",
         len(collected["youtube"]),
         len(collected["reddit"]),
         len(collected["tiktok"]),
         len(collected["google_trends"]),
         len(collected["rss_feeds"]),
+        len(collected["instagram"]),
         total,
     )
     return collected

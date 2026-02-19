@@ -1,6 +1,6 @@
-"""TikTok ハッシュタグページの軽量スクレイピング.
+"""TikTok の食品関連トレンドを収集.
 
-TikTokはボット検知が厳しいため、失敗時はスキップする（graceful degradation）。
+TikTokはボット検知が厳しいため、複数の方法を試みて失敗時はスキップする。
 """
 
 import json
@@ -22,6 +22,8 @@ FOOD_HASHTAGS = [
     "viralrecipe",
     "newdrink",
     "asianfood",
+    "trendingfood",
+    "foodasmr",
 ]
 
 HEADERS = {
@@ -30,7 +32,9 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/131.0.0.0 Safari/537.36"
     ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
 }
 
 
@@ -47,7 +51,7 @@ def collect() -> list[dict]:
             logger.warning("TikTokハッシュタグ取得失敗 (#%s): %s", tag, e)
 
     if not results:
-        logger.warning("TikTok: 全ハッシュタグ取得失敗。スキップします。")
+        logger.warning("TikTok: データ取得失敗。スキップします。")
     else:
         logger.info("TikTok: %d 件取得", len(results))
 
@@ -63,55 +67,124 @@ def _fetch_hashtag(tag: str) -> dict | None:
 
     html = resp.text
 
-    # SIGI_STATE または __UNIVERSAL_DATA_FOR_REHYDRATION__ からJSON抽出を試みる
-    video_count = None
-    view_count = None
+    # 複数のJSON抽出パターンを試行
+    extractors = [
+        _extract_sigi_state,
+        _extract_universal_data,
+        _extract_next_data,
+        _extract_json_ld,
+    ]
 
-    # パターン1: SIGI_STATE
+    for extractor in extractors:
+        try:
+            result = extractor(html, tag)
+            if result:
+                return result
+        except Exception:
+            continue
+
+    # JSONが取れなくても、ページタイトルから情報を抽出
+    title_match = re.search(r"<title>(.*?)</title>", html)
+    if title_match:
+        title = title_match.group(1)
+        # タイトルに動画数が含まれている場合がある (例: "123.4K videos")
+        count_match = re.search(r"([\d.]+[KMB]?)\s*(?:videos|posts)", title, re.I)
+        if count_match:
+            return {
+                "platform": "TikTok",
+                "hashtag": f"#{tag}",
+                "video_count_text": count_match.group(1),
+                "url": url,
+            }
+
+    return None
+
+
+def _extract_sigi_state(html: str, tag: str) -> dict | None:
     match = re.search(
         r'<script id="SIGI_STATE"[^>]*>(.*?)</script>', html, re.DOTALL
     )
-    if match:
-        try:
-            state = json.loads(match.group(1))
-            challenge_info = (
-                state.get("ChallengePage", {})
-                .get("challengeInfo", {})
-                .get("stats", {})
-            )
-            video_count = challenge_info.get("videoCount")
-            view_count = challenge_info.get("viewCount")
-        except (json.JSONDecodeError, AttributeError):
-            pass
-
-    # パターン2: __UNIVERSAL_DATA_FOR_REHYDRATION__
-    if video_count is None:
-        match = re.search(
-            r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>',
-            html,
-            re.DOTALL,
-        )
-        if match:
-            try:
-                state = json.loads(match.group(1))
-                # ネストされたデータ構造を探索
-                default_scope = state.get("__DEFAULT_SCOPE__", {})
-                webapp_data = default_scope.get("webapp.challenge-detail", {})
-                challenge_info = webapp_data.get("challengeInfo", {})
-                stats = challenge_info.get("stats", {})
-                video_count = stats.get("videoCount")
-                view_count = stats.get("viewCount")
-            except (json.JSONDecodeError, AttributeError):
-                pass
-
-    if video_count is None and view_count is None:
-        logger.debug("TikTok #%s: データ抽出失敗", tag)
+    if not match:
         return None
-
+    state = json.loads(match.group(1))
+    stats = (
+        state.get("ChallengePage", {})
+        .get("challengeInfo", {})
+        .get("stats", {})
+    )
+    if not stats:
+        return None
     return {
         "platform": "TikTok",
         "hashtag": f"#{tag}",
-        "video_count": video_count,
-        "view_count": view_count,
-        "url": url,
+        "video_count": stats.get("videoCount"),
+        "view_count": stats.get("viewCount"),
+        "url": f"https://www.tiktok.com/tag/{tag}",
     }
+
+
+def _extract_universal_data(html: str, tag: str) -> dict | None:
+    match = re.search(
+        r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>',
+        html,
+        re.DOTALL,
+    )
+    if not match:
+        return None
+    state = json.loads(match.group(1))
+    # ネスト構造を探索
+    for key in state:
+        scope = state[key] if isinstance(state[key], dict) else {}
+        for subkey in scope:
+            if "challenge" in subkey.lower():
+                challenge_data = scope[subkey]
+                if isinstance(challenge_data, dict):
+                    stats = challenge_data.get("challengeInfo", {}).get("stats", {})
+                    if stats:
+                        return {
+                            "platform": "TikTok",
+                            "hashtag": f"#{tag}",
+                            "video_count": stats.get("videoCount"),
+                            "view_count": stats.get("viewCount"),
+                            "url": f"https://www.tiktok.com/tag/{tag}",
+                        }
+    return None
+
+
+def _extract_next_data(html: str, tag: str) -> dict | None:
+    match = re.search(
+        r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL
+    )
+    if not match:
+        return None
+    state = json.loads(match.group(1))
+    # props.pageProps内を探索
+    page_props = state.get("props", {}).get("pageProps", {})
+    if page_props:
+        return {
+            "platform": "TikTok",
+            "hashtag": f"#{tag}",
+            "data_available": True,
+            "url": f"https://www.tiktok.com/tag/{tag}",
+        }
+    return None
+
+
+def _extract_json_ld(html: str, tag: str) -> dict | None:
+    matches = re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL
+    )
+    for m in matches:
+        try:
+            data = json.loads(m)
+            if isinstance(data, dict) and data.get("name"):
+                return {
+                    "platform": "TikTok",
+                    "hashtag": f"#{tag}",
+                    "name": data.get("name"),
+                    "description": (data.get("description") or "")[:100],
+                    "url": f"https://www.tiktok.com/tag/{tag}",
+                }
+        except json.JSONDecodeError:
+            continue
+    return None
