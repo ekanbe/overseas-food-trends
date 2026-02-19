@@ -23,7 +23,7 @@ SYSTEM_INSTRUCTION = """\
 """
 
 ANALYSIS_PROMPT = """\
-以下は海外のYouTube、Reddit、TikTokから収集した食品関連データです。
+以下は海外のYouTube、Reddit、TikTok、Google Trends、海外フードメディア(RSS)から収集した食品関連データです。
 このデータを分析し、日本の食品卸会社が注目すべきトレンドを3〜5件に厳選してください。
 
 ## 選別基準

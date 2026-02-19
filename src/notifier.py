@@ -119,7 +119,7 @@ def _format_message(result: dict) -> str:
             "",
             "━━━━━━━━━━━━━",
             "🤖 マルイ物産 AI トレンド分析",
-            "　 powered by Gemini + YouTube + Reddit",
+            "　 powered by Gemini + YouTube + Google Trends + Food Media",
         ]
     )
 
