@@ -8,6 +8,7 @@ from linebot.v3.messaging import (
     Configuration,
     ApiClient,
     MessagingApi,
+    BroadcastRequest,
     PushMessageRequest,
     TextMessage,
 )
@@ -19,12 +20,15 @@ MAX_MESSAGE_LENGTH = 4500  # 余裕を持って4500文字（LINE上限は5000）
 
 
 def send(analysis_result: dict) -> bool:
-    """分析結果をLINEで送信する. 成功時True."""
-    token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
-    user_id = os.environ.get("LINE_USER_ID")
+    """分析結果をLINEで送信する. 成功時True.
 
-    if not token or not user_id:
-        logger.error("LINE認証情報が未設定")
+    ブロードキャスト（友だち全員に配信）を使用。
+    フォールバックとして個別プッシュも試行。
+    """
+    token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
+
+    if not token:
+        logger.error("LINE_CHANNEL_ACCESS_TOKEN が未設定")
         return False
 
     message_text = _format_message(analysis_result)
@@ -35,17 +39,35 @@ def send(analysis_result: dict) -> bool:
     try:
         with ApiClient(configuration) as api_client:
             api = MessagingApi(api_client)
-            api.push_message(
-                PushMessageRequest(
-                    to=user_id,
+            api.broadcast(
+                BroadcastRequest(
                     messages=[TextMessage(text=m) for m in messages],
                 )
             )
-        logger.info("LINE送信成功: %d メッセージ", len(messages))
+        logger.info("LINEブロードキャスト送信成功: %d メッセージ", len(messages))
         return True
     except Exception as e:
-        logger.error("LINE送信失敗: %s", e)
-        return False
+        logger.warning("ブロードキャスト失敗: %s — 個別プッシュを試行", e)
+
+        # フォールバック: 個別プッシュ
+        user_id = os.environ.get("LINE_USER_ID")
+        if not user_id:
+            logger.error("LINE_USER_ID も未設定のため送信不可")
+            return False
+        try:
+            with ApiClient(configuration) as api_client:
+                api = MessagingApi(api_client)
+                api.push_message(
+                    PushMessageRequest(
+                        to=user_id,
+                        messages=[TextMessage(text=m) for m in messages],
+                    )
+                )
+            logger.info("LINE個別プッシュ送信成功: %d メッセージ", len(messages))
+            return True
+        except Exception as e2:
+            logger.error("LINE送信完全失敗: %s", e2)
+            return False
 
 
 def _format_message(result: dict) -> str:
