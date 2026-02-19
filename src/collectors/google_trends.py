@@ -32,7 +32,7 @@ def collect() -> list[dict]:
         return []
 
     # 1. 急上昇ワード (Daily Trending Searches)
-    for region in ["united_states", "south_korea", "taiwan", "thailand", "vietnam"]:
+    for region in ["united_states", "south_korea", "japan", "singapore", "india"]:
         try:
             trending = pytrends.trending_searches(pn=region)
             for _, row in trending.head(20).iterrows():

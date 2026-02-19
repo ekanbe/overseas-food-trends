@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import logging
 
 from google import genai
@@ -20,41 +21,43 @@ SYSTEM_INSTRUCTION = """\
 - ドバイチョコ（UAE→日本）
 - 台湾カステラ（台湾→日本）
 - チーズタッカルビ（韓国→日本）
+
+重要: 出力は必ず完全なJSONで返すこと。途中で切れないように、3件に厳選して簡潔に記述すること。
+各フィールドの値は短く簡潔に（各50文字以内）。reference_urlsは1件のみ。
 """
 
 ANALYSIS_PROMPT = """\
-以下は海外のYouTube、Reddit、TikTok、Google Trends、海外フードメディア(RSS)から収集した食品関連データです。
-このデータを分析し、日本の食品卸会社が注目すべきトレンドを3〜5件に厳選してください。
+以下は海外のYouTube、Google Trends、海外フードメディア(RSS)等から収集した食品関連データです。
+このデータを分析し、日本の食品卸会社が注目すべきトレンドを3件に厳選してください。
 
 ## 選別基準
-1. **食品フィルタ**: 食品・ドリンク・スイーツに直接関連するもののみ
-2. **急上昇判定**: 直近1週間で急激に注目度が上がっているもの
-3. **日本未上陸判定**: まだ日本で広く知られていないもの（既に日本で流行済みのものは除外）
-4. **再現可能性**: 日本の飲食店・食品メーカーで再現可能なもの
-5. **ビジネスポテンシャル**: 食品卸会社として商機があるもの
+1. 食品・ドリンク・スイーツに直接関連するもののみ
+2. 直近1週間で急激に注目度が上がっているもの
+3. まだ日本で広く知られていないもの
+4. 日本の飲食店で再現可能なもの
 
 ## 収集データ
 {data}
 
-## 出力形式
-以下のJSON形式で出力してください。必ず3〜5件に厳選すること。
+## 出力形式（厳守）
+必ず3件。各値は短く簡潔に。
 
 {{
   "trends": [
     {{
       "rank": 1,
       "product_name_en": "English name",
-      "product_name_ja": "日本語名（推定）",
+      "product_name_ja": "日本語名",
       "origin_country": "発祥国",
-      "platforms": ["検出されたプラットフォーム"],
-      "metrics": "具体的な数値（再生数、スコア等）",
-      "target_audience": "想定ターゲット層",
-      "why_trending": "流行している理由（1-2文）",
-      "japan_forecast": "日本上陸予測（時期・可能性・展開方法）",
-      "reference_urls": ["参照URL"]
+      "platforms": ["YouTube"],
+      "metrics": "再生数100万等",
+      "target_audience": "20-30代女性等",
+      "why_trending": "理由を1文で",
+      "japan_forecast": "予測を1文で",
+      "reference_urls": ["https://example.com"]
     }}
   ],
-  "summary": "今週のトレンド総括（2-3文）"
+  "summary": "総括を1文で"
 }}
 """
 
@@ -68,59 +71,74 @@ def analyze(collected_data: dict) -> dict | None:
 
     client = genai.Client(api_key=api_key)
 
-    # 収集データをJSON文字列化
-    data_str = json.dumps(collected_data, ensure_ascii=False, indent=2)
+    # 収集データをJSON文字列化（コンパクトに）
+    data_str = json.dumps(collected_data, ensure_ascii=False, separators=(",", ":"))
 
-    # データが大きすぎる場合は切り詰め（Geminiの入力制限対応）
-    if len(data_str) > 30000:
-        data_str = data_str[:30000] + "\n... (データが大きいため以降省略)"
+    # データが大きすぎる場合は切り詰め
+    if len(data_str) > 25000:
+        data_str = data_str[:25000] + "..."
 
     prompt = ANALYSIS_PROMPT.format(data=data_str)
 
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-                response_mime_type="application/json",
-                temperature=0.7,
-                max_output_tokens=8192,
-            ),
-        )
-
-        result = json.loads(response.text)
-        logger.info(
-            "Gemini分析完了: %d 件のトレンドを検出", len(result.get("trends", []))
-        )
-        return result
-
-    except json.JSONDecodeError as e:
-        logger.error("Gemini応答のJSON解析失敗: %s", e)
-        logger.info("Gemini raw response (last 300 chars): %s", response.text[-300:])
-        return None
-    except Exception as e:
-        logger.error("Gemini API呼び出し失敗: %s", e)
-
-        # フォールバック: gemini-2.5-flash-lite
+    for model_name in ["gemini-2.5-flash", "gemini-2.5-flash-lite"]:
         try:
-            logger.info("フォールバック: gemini-2.5-flash-lite を試行")
+            logger.info("Gemini分析開始: %s", model_name)
             response = client.models.generate_content(
-                model="gemini-2.5-flash-lite",
+                model=model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_INSTRUCTION,
                     response_mime_type="application/json",
-                    temperature=0.7,
+                    temperature=0.5,
                     max_output_tokens=4096,
                 ),
             )
-            result = json.loads(response.text)
-            logger.info(
-                "Gemini(lite)分析完了: %d 件のトレンドを検出",
-                len(result.get("trends", [])),
-            )
-            return result
-        except Exception as e2:
-            logger.error("Gemini(lite)もAPI失敗: %s", e2)
-            return None
+
+            result = _parse_response(response.text)
+            if result:
+                logger.info(
+                    "Gemini分析完了(%s): %d 件のトレンドを検出",
+                    model_name,
+                    len(result.get("trends", [])),
+                )
+                return result
+
+        except Exception as e:
+            logger.warning("Gemini API失敗 (%s): %s", model_name, e)
+
+    logger.error("全Geminiモデルで分析失敗")
+    return None
+
+
+def _parse_response(text: str) -> dict | None:
+    """Geminiの応答をパース。不完全なJSONも修復を試みる."""
+    # まず普通にパース
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # 不完全なJSONを修復: 閉じカッコを補完
+    try:
+        fixed = text.rstrip()
+        # 開き括弧と閉じ括弧の数を数えて補完
+        open_braces = fixed.count("{") - fixed.count("}")
+        open_brackets = fixed.count("[") - fixed.count("]")
+
+        # 末尾の不完全なオブジェクトを削除
+        # 最後の完全なオブジェクトの後で切る
+        last_complete = fixed.rfind("},")
+        if last_complete > 0 and (open_braces > 0 or open_brackets > 0):
+            fixed = fixed[: last_complete + 1]
+            # 閉じカッコを補完
+            fixed += "]" * max(0, fixed.count("[") - fixed.count("]"))
+            fixed += "}" * max(0, fixed.count("{") - fixed.count("}"))
+
+        result = json.loads(fixed)
+        logger.info("JSON修復成功")
+        return result
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    logger.error("JSON修復失敗。応答末尾: %s", text[-200:])
+    return None

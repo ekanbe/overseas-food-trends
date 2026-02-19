@@ -11,13 +11,10 @@ logger = logging.getLogger(__name__)
 # 海外フードメディアのRSSフィード
 FEEDS = {
     "Eater": "https://www.eater.com/rss/index.xml",
-    "Food52": "https://food52.com/blog.rss",
     "Bon Appetit": "https://www.bonappetit.com/feed/rss",
-    "Serious Eats": "https://www.seriouseats.com/rss",
-    "Delish": "https://www.delish.com/rss/",
-    "Tastingtable": "https://www.tastingtable.com/rss",
+    "Tastingtable": "https://www.tastingtable.com/feed/",
     "FoodBeast": "https://www.foodbeast.com/feed/",
-    "The Kitchn": "https://www.thekitchn.com/rss2",
+    "Food Network": "https://www.foodnetwork.com/fn-dish/rss.xml",
 }
 
 HEADERS = {
