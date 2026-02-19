@@ -72,8 +72,8 @@ def analyze(collected_data: dict) -> dict | None:
     data_str = json.dumps(collected_data, ensure_ascii=False, indent=2)
 
     # データが大きすぎる場合は切り詰め（Geminiの入力制限対応）
-    if len(data_str) > 80000:
-        data_str = data_str[:80000] + "\n... (データが大きいため以降省略)"
+    if len(data_str) > 30000:
+        data_str = data_str[:30000] + "\n... (データが大きいため以降省略)"
 
     prompt = ANALYSIS_PROMPT.format(data=data_str)
 
@@ -85,7 +85,7 @@ def analyze(collected_data: dict) -> dict | None:
                 system_instruction=SYSTEM_INSTRUCTION,
                 response_mime_type="application/json",
                 temperature=0.7,
-                max_output_tokens=4096,
+                max_output_tokens=8192,
             ),
         )
 
@@ -97,7 +97,7 @@ def analyze(collected_data: dict) -> dict | None:
 
     except json.JSONDecodeError as e:
         logger.error("Gemini応答のJSON解析失敗: %s", e)
-        logger.debug("Gemini raw response: %s", response.text[:500])
+        logger.info("Gemini raw response (last 300 chars): %s", response.text[-300:])
         return None
     except Exception as e:
         logger.error("Gemini API呼び出し失敗: %s", e)
