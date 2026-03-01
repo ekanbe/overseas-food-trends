@@ -1,14 +1,24 @@
-name: Daily Food Trend Detection
+name: Daily Food Trend Report
 
 on:
   schedule:
-    - cron: '0 23 * * *'
+    # 毎朝8時JST = UTC 23時（前日）
+    - cron: '0 23 * * 0-5'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: '実行モード'
+        required: false
+        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - weekly
 
 jobs:
   detect-trends:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -25,11 +35,35 @@ jobs:
 
       - name: Run trend detection
         env:
+          # Gemini AI
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # YouTube
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          # Reddit
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
           REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # X (Twitter)
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          # Naver
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          # LINE Works
+          LINEWORKS_BOT_ID: ${{ secrets.LINEWORKS_BOT_ID }}
+          LINEWORKS_CLIENT_ID: ${{ secrets.LINEWORKS_CLIENT_ID }}
+          LINEWORKS_CLIENT_SECRET: ${{ secrets.LINEWORKS_CLIENT_SECRET }}
+          LINEWORKS_SERVICE_ACCOUNT: ${{ secrets.LINEWORKS_SERVICE_ACCOUNT }}
+          LINEWORKS_PRIVATE_KEY: ${{ secrets.LINEWORKS_PRIVATE_KEY }}
+          LINEWORKS_CHANNEL_ID: ${{ secrets.LINEWORKS_CHANNEL_ID }}
+          # LINE (フォールバック)
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
-        run: python src/main.py
+        run: python src/main.py --mode ${{ github.event.inputs.mode || 'daily' }}
+
+      - name: Commit data changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "データを更新"
+          git push
