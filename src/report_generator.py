@@ -25,7 +25,7 @@ LIFECYCLE_LEGEND = (
 def format_daily_report(analysis: dict) -> str:
     """日報のテキストレポートを生成."""
     now = datetime.now(JST)
-    date_str = now.strftime("%Y年%-m月%-d日")
+    date_str = f"{now.year}年{now.month}月{now.day}日"
     weekday = WEEKDAYS_JA[now.weekday()]
 
     sections = []

@@ -175,6 +175,12 @@ DAILY_PROMPT = """\
 - foodtech: 3件
 - regulation: リスク2件, チャンス2件
 - action_items: 5件（高2, 中2, 低1）
+
+## 重要: 各フィールドの文字数を抑えること
+- 各テキストフィールドは100文字以内を目安に簡潔に
+- why_trending, japan_market_fit, procurement_note は各2文以内
+- detail は3文以内
+- 完全なJSONを返すことを最優先し、冗長な説明は避ける
 """
 
 # ──────────────────────────────────────────
@@ -324,7 +330,7 @@ def _call_gemini(prompt: str, mode_label: str) -> dict | None:
                     system_instruction=SYSTEM_INSTRUCTION,
                     response_mime_type="application/json",
                     temperature=0.5,
-                    max_output_tokens=8192,
+                    max_output_tokens=16384,
                 ),
             )
 

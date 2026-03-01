@@ -61,7 +61,7 @@ def get_week_info() -> tuple[int, str]:
     monday = now - timedelta(days=now.weekday())
     sunday = monday + timedelta(days=6)
 
-    date_range = f"{monday.strftime('%-m/%-d')}〜{sunday.strftime('%-m/%-d')}"
+    date_range = f"{monday.month}/{monday.day}〜{sunday.month}/{sunday.day}"
     return week_number, date_range
 
 

@@ -25,7 +25,7 @@ import jwt
 logger = logging.getLogger(__name__)
 
 JST = timezone(timedelta(hours=9))
-MAX_MESSAGE_LENGTH = 4000  # LINE Worksのテキスト上限に余裕を持って設定
+MAX_MESSAGE_LENGTH = 2000  # LINE Works テキスト上限（余裕を持って設定）
 
 # LINE Works API v2.0 endpoints
 AUTH_URL = "https://auth.worksmobile.com/oauth2/v2.0/token"
@@ -90,7 +90,14 @@ def _send_lineworks(text: str) -> bool:
                     }
                 }
                 resp = client.post(url, json=body)
-                resp.raise_for_status()
+
+                if resp.status_code >= 400:
+                    logger.error(
+                        "LINE Works API エラー [%s]: %s",
+                        resp.status_code,
+                        resp.text,
+                    )
+                    resp.raise_for_status()
 
                 # レート制限対策: 複数メッセージ間に短い待機
                 if i < len(messages) - 1:
