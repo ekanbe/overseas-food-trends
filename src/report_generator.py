@@ -75,7 +75,7 @@ def format_daily_report(analysis: dict) -> str:
             if refs:
                 trend_lines.append("  参照:")
                 for ref in refs:
-                    trend_lines.append(f"    {ref}")
+                    trend_lines.append(f"    {_format_ref(ref)}")
             trend_lines.append("──────────────────")
 
         trend_lines.append(f"\n  {LIFECYCLE_LEGEND}")
@@ -106,7 +106,7 @@ def format_daily_report(analysis: dict) -> str:
                         asia_lines.append(f"    → {impl}")
                     refs = item.get("references", [])
                     if refs:
-                        asia_lines.append(f"    参照: {' / '.join(refs)}")
+                        asia_lines.append(f"    参照: {_format_refs_inline(refs)}")
                     asia_lines.append("")
         sections.append("\n".join(asia_lines))
 
@@ -129,7 +129,7 @@ def format_daily_report(analysis: dict) -> str:
                         news_lines.append(f"    → マルイ物産への示唆: {impl}")
                     refs = item.get("references", [])
                     if refs:
-                        news_lines.append(f"    参照: {' / '.join(refs)}")
+                        news_lines.append(f"    参照: {_format_refs_inline(refs)}")
         sections.append("\n".join(news_lines))
 
     # ━━ フードテック・イノベーション ━━
@@ -147,7 +147,7 @@ def format_daily_report(analysis: dict) -> str:
                 ft_lines.append(f"    影響: {impact}")
             refs = item.get("references", [])
             if refs:
-                ft_lines.append(f"    参照: {' / '.join(refs)}")
+                ft_lines.append(f"    参照: {_format_refs_inline(refs)}")
         sections.append("\n".join(ft_lines))
 
     # ━━ 規制・政策ウォッチ ━━
@@ -169,7 +169,7 @@ def format_daily_report(analysis: dict) -> str:
                     reg_lines.append(f"    影響: {impact}")
                 refs = item.get("references", [])
                 if refs:
-                    reg_lines.append(f"    参照: {' / '.join(refs)}")
+                    reg_lines.append(f"    参照: {_format_refs_inline(refs)}")
 
         opps = reg.get("opportunities", [])
         if opps:
@@ -185,7 +185,7 @@ def format_daily_report(analysis: dict) -> str:
                     reg_lines.append(f"    → チャンス: {opp}")
                 refs = item.get("references", [])
                 if refs:
-                    reg_lines.append(f"    参照: {' / '.join(refs)}")
+                    reg_lines.append(f"    参照: {_format_refs_inline(refs)}")
         sections.append("\n".join(reg_lines))
 
     # ━━ アクション示唆 ━━
@@ -243,7 +243,7 @@ def format_weekly_report(analysis: dict, week_number: int, date_range: str) -> s
                 ts_lines.append(f"    ステージ: {item.get('stage_change', '')}")
                 refs = item.get("references", [])
                 if refs:
-                    ts_lines.append(f"    参照: {', '.join(refs)}")
+                    ts_lines.append(f"    参照: {_format_refs_inline(refs)}")
                 ts_lines.append("")
 
         new_items = trend_summary.get("new_detected", [])
@@ -255,7 +255,7 @@ def format_weekly_report(analysis: dict, week_number: int, date_range: str) -> s
                 ts_lines.append(f"    ステージ: {item.get('stage', '')}")
                 refs = item.get("references", [])
                 if refs:
-                    ts_lines.append(f"    参照: {', '.join(refs)}")
+                    ts_lines.append(f"    参照: {_format_refs_inline(refs)}")
                 ts_lines.append("")
 
         decel = trend_summary.get("decelerating", [])
@@ -266,7 +266,7 @@ def format_weekly_report(analysis: dict, week_number: int, date_range: str) -> s
                 ts_lines.append(f"    {item.get('change', '')}")
                 refs = item.get("references", [])
                 if refs:
-                    ts_lines.append(f"    参照: {', '.join(refs)}")
+                    ts_lines.append(f"    参照: {_format_refs_inline(refs)}")
                 ts_lines.append("")
 
         sections.append("\n".join(ts_lines))
@@ -293,7 +293,7 @@ def format_weekly_report(analysis: dict, week_number: int, date_range: str) -> s
                         asia_lines.append(f"  {line}")
                 refs = region.get("references", [])
                 if refs:
-                    asia_lines.append(f"  参照: {', '.join(refs)}")
+                    asia_lines.append(f"  参照: {_format_refs_inline(refs)}")
         sections.append("\n".join(asia_lines))
 
     # ━━ 業界動向まとめ ━━
@@ -316,7 +316,7 @@ def format_weekly_report(analysis: dict, week_number: int, date_range: str) -> s
                     ind_lines.append(display)
                     refs = item.get("references", [])
                     if refs:
-                        ind_lines.append(f"    参照: {', '.join(refs)}")
+                        ind_lines.append(f"    参照: {_format_refs_inline(refs)}")
         sections.append("\n".join(ind_lines))
 
     # ━━ 来週の注目ポイント ━━
@@ -340,6 +340,26 @@ def format_weekly_report(analysis: dict, week_number: int, date_range: str) -> s
     )
 
     return "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n".join(sections)
+
+
+def _format_ref(ref) -> str:
+    """参照を表示用テキストに変換する.
+
+    dict形式: {"text": "...", "url": "..."} → "text (url)" or "text"
+    str形式: そのまま返す
+    """
+    if isinstance(ref, dict):
+        text = ref.get("text", "")
+        url = ref.get("url", "")
+        if url:
+            return f"{text}\n      {url}"
+        return text
+    return str(ref)
+
+
+def _format_refs_inline(refs: list) -> str:
+    """参照リストをインライン表示用テキストに変換する."""
+    return " / ".join(_format_ref(r) for r in refs)
 
 
 def _wrap_text(text: str, width: int) -> list[str]:

@@ -27,6 +27,7 @@ from weekly_aggregator import (
     save_daily_analysis, load_weekly_data, get_week_info, cleanup_old_reports,
 )
 from url_validator import validate_trends
+from link_generator import enrich_references
 
 logging.basicConfig(
     level=logging.INFO,
@@ -106,31 +107,35 @@ def run_daily():
         sys.exit(1)
     logger.info("日報分析完了")
 
-    # Step 4: 参照URLの検証（トレンドTOP3のみ）
+    # Step 4: 参照リンクの補完（URLが空の参照に検索URLを自動生成）
+    logger.info("参照リンクを補完中...")
+    analysis = enrich_references(analysis)
+
+    # Step 5: 参照URLの検証（トレンドTOP3のみ）
     top_trends = analysis.get("top_trends", [])
     if top_trends:
         logger.info("参照URLを検証中...")
         analysis["top_trends"] = validate_trends(top_trends)
 
-    # Step 5: 日報データを保存（週報用）
+    # Step 6: 日報データを保存（週報用）
     save_daily_analysis(analysis)
 
-    # Step 6: レポートテキストを生成
+    # Step 7: レポートテキストを生成
     report_text = format_daily_report(analysis)
     logger.info("日報レポート生成完了（%d 文字）", len(report_text))
 
-    # Step 7: LINE Works配信
+    # Step 8: LINE Works配信
     logger.info("LINE Works配信を開始...")
     success = send(report_text)
     if not success:
         logger.error("配信に失敗しました。")
         sys.exit(1)
 
-    # Step 8: 配信履歴を更新
+    # Step 9: 配信履歴を更新
     if top_trends:
         save_history(history, top_trends)
 
-    # Step 9: 古いデータのクリーンアップ
+    # Step 10: 古いデータのクリーンアップ
     cleanup_old_reports()
 
     logger.info("=== 日報モード 完了 ===")
@@ -155,14 +160,18 @@ def run_weekly():
         sys.exit(1)
     logger.info("週報分析完了")
 
-    # Step 3: 週番号と日付範囲を取得
+    # Step 3: 参照リンクの補完
+    logger.info("参照リンクを補完中...")
+    analysis = enrich_references(analysis)
+
+    # Step 4: 週番号と日付範囲を取得
     week_number, date_range = get_week_info()
 
-    # Step 4: レポートテキストを生成
+    # Step 5: レポートテキストを生成
     report_text = format_weekly_report(analysis, week_number, date_range)
     logger.info("週報レポート生成完了（%d 文字）", len(report_text))
 
-    # Step 5: LINE Works配信
+    # Step 6: LINE Works配信
     logger.info("LINE Works配信を開始...")
     success = send(report_text)
     if not success:

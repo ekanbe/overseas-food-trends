@@ -73,7 +73,10 @@ DAILY_PROMPT = """\
       "why_trending": "流行理由を2-3文で",
       "japan_market_fit": "日本市場との親和性を2文で",
       "procurement_note": "マルイ物産の調達可能性を2文で",
-      "references": ["小红书 #冰花奶茶 トレンドページ", "抖音 話題動画（再生数上位）"]
+      "references": [
+        {{"text": "小红书 #冰花奶茶 トレンドページ", "url": "https://実際のURL（分かる場合）"}},
+        {{"text": "抖音 話題動画（再生数上位）", "url": ""}}
+      ]
     }}
   ],
 
@@ -83,7 +86,7 @@ DAILY_PROMPT = """\
         "headline": "見出し",
         "detail": "3-4行の詳細説明",
         "implication": "マルイ物産への示唆",
-        "references": ["小红书 #轻食", "36Kr 消費トレンド"]
+        "references": [{{"text": "小红书 #轻食", "url": ""}}, {{"text": "36Kr 消費トレンド", "url": ""}}]
       }}
     ],
     "korea": [
@@ -91,7 +94,7 @@ DAILY_PROMPT = """\
         "headline": "見出し",
         "detail": "3-4行の詳細説明",
         "implication": "マルイ物産への示唆",
-        "references": ["Naver Blog 약과", "r/KoreanFood"]
+        "references": [{{"text": "Naver Blog 약과", "url": ""}}, {{"text": "r/KoreanFood", "url": ""}}]
       }}
     ],
     "taiwan": [
@@ -99,7 +102,7 @@ DAILY_PROMPT = """\
         "headline": "見出し",
         "detail": "3-4行の詳細説明",
         "implication": "マルイ物産への示唆",
-        "references": ["Instagram #果醬飲", "PTT美食板"]
+        "references": [{{"text": "Instagram #果醬飲", "url": ""}}, {{"text": "PTT美食板", "url": ""}}]
       }}
     ],
     "southeast_asia": [
@@ -107,7 +110,7 @@ DAILY_PROMPT = """\
         "headline": "見出し",
         "detail": "3-4行の詳細説明",
         "implication": "マルイ物産への示唆",
-        "references": ["Instagram #bangkokcoffee", "Food Navigator Asia"]
+        "references": [{{"text": "Instagram #bangkokcoffee", "url": ""}}, {{"text": "Food Navigator Asia", "url": ""}}]
       }}
     ]
   }},
@@ -118,7 +121,7 @@ DAILY_PROMPT = """\
         "headline": "見出し",
         "detail": "2-3行の詳細",
         "implication": "マルイ物産への示唆",
-        "references": ["Restaurant Business Online"]
+        "references": [{{"text": "Restaurant Business Online", "url": ""}}]
       }}
     ],
     "asian": [
@@ -126,7 +129,7 @@ DAILY_PROMPT = """\
         "headline": "見出し",
         "detail": "2-3行の詳細",
         "implication": "マルイ物産への示唆",
-        "references": ["KoreaBizWire"]
+        "references": [{{"text": "KoreaBizWire", "url": ""}}]
       }}
     ]
   }},
@@ -136,7 +139,7 @@ DAILY_PROMPT = """\
       "headline": "見出し",
       "detail": "2-3行の詳細",
       "impact": "外食産業への影響",
-      "references": ["The Spoon"]
+      "references": [{{"text": "The Spoon", "url": ""}}]
     }}
   ],
 
@@ -146,7 +149,7 @@ DAILY_PROMPT = """\
         "headline": "見出し",
         "detail": "2-3行の詳細",
         "impact": "影響",
-        "references": ["Food Navigator"]
+        "references": [{{"text": "Food Navigator", "url": ""}}]
       }}
     ],
     "opportunities": [
@@ -154,7 +157,7 @@ DAILY_PROMPT = """\
         "headline": "見出し",
         "detail": "2-3行の詳細",
         "opportunity": "チャンスの説明",
-        "references": ["Food Navigator Asia"]
+        "references": [{{"text": "Food Navigator Asia", "url": ""}}]
       }}
     ]
   }},
@@ -181,6 +184,11 @@ DAILY_PROMPT = """\
 - why_trending, japan_market_fit, procurement_note は各2文以内
 - detail は3文以内
 - 完全なJSONを返すことを最優先し、冗長な説明は避ける
+
+## references の書式
+- 各referenceは {{"text": "表示テキスト", "url": "https://..."}} のオブジェクト形式で出力
+- urlには実際のURLが分かる場合のみ記入し、不明な場合は空文字 "" にすること
+- RSSフィードの記事URLなど確実なURLがある場合は必ず記入すること
 """
 
 # ──────────────────────────────────────────
@@ -205,7 +213,7 @@ WEEKLY_PROMPT = """\
         "last_week": "先週の指標",
         "this_week": "今週の指標",
         "stage_change": "成長初期 → 成長期に移行",
-        "references": ["参照元"]
+        "references": [{{"text": "参照元", "url": ""}}]
       }}
     ],
     "new_detected": [
@@ -213,14 +221,14 @@ WEEKLY_PROMPT = """\
         "name": "トレンド名",
         "description": "今週初検出。概要",
         "stage": "発生期",
-        "references": ["参照元"]
+        "references": [{{"text": "参照元", "url": ""}}]
       }}
     ],
     "decelerating": [
       {{
         "name": "トレンド名",
         "change": "先週比-15%。ピーク通過の兆候",
-        "references": ["参照元"]
+        "references": [{{"text": "参照元", "url": ""}}]
       }}
     ]
   }},
@@ -252,20 +260,20 @@ WEEKLY_PROMPT = """\
     "important": [
       {{
         "headline": "見出し",
-        "references": ["参照元"]
+        "references": [{{"text": "参照元", "url": ""}}]
       }}
     ],
     "technology": [
       {{
         "headline": "見出し",
-        "references": ["参照元"]
+        "references": [{{"text": "参照元", "url": ""}}]
       }}
     ],
     "regulation": [
       {{
         "headline": "見出し",
         "emoji": "⚠ or 🔓",
-        "references": ["参照元"]
+        "references": [{{"text": "参照元", "url": ""}}]
       }}
     ]
   }},

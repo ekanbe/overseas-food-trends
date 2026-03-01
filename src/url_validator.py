@@ -36,12 +36,29 @@ def is_reachable(url: str) -> bool:
         return False
 
 
+def _extract_url_from_ref(ref) -> str | None:
+    """参照からURLを抽出する（dict/str両対応）."""
+    if isinstance(ref, dict):
+        url = ref.get("url", "")
+        if url and url.startswith("http"):
+            return url
+        # text内にURLが含まれる場合
+        text = ref.get("text", "")
+        urls = URL_PATTERN.findall(text)
+        return urls[0] if urls else None
+    elif isinstance(ref, str):
+        urls = URL_PATTERN.findall(ref)
+        return urls[0] if urls else None
+    return None
+
+
 def validate_trends(trends: list[dict]) -> list[dict]:
     """各トレンドの参照URLを検証.
 
-    reference_urls（旧形式）と references（新形式）の両方に対応。
-    新形式の場合、references内のURLを抽出して検証。
-    URLが含まれないテキスト参照はそのまま残す。
+    対応形式:
+    - dict形式: {"text": "...", "url": "https://..."} — url フィールドを検証
+    - str形式: テキスト内のURLを抽出して検証（後方互換）
+    - reference_urls（旧形式）: URLリストを検証
     """
     url_map: dict[str, bool] = {}
     all_urls = []
@@ -51,15 +68,14 @@ def validate_trends(trends: list[dict]) -> list[dict]:
         for url in t.get("reference_urls", []):
             if url and url.startswith("http") and url not in url_map:
                 all_urls.append(url)
-                url_map[url] = True  # プレースホルダー
+                url_map[url] = True
 
-        # 新形式: references（テキストからURL抽出）
+        # references（dict/str 両対応）
         for ref in t.get("references", []):
-            urls_in_ref = URL_PATTERN.findall(ref)
-            for url in urls_in_ref:
-                if url not in url_map:
-                    all_urls.append(url)
-                    url_map[url] = True
+            url = _extract_url_from_ref(ref)
+            if url and url not in url_map:
+                all_urls.append(url)
+                url_map[url] = True
 
     if not all_urls:
         return trends
@@ -88,16 +104,22 @@ def validate_trends(trends: list[dict]) -> list[dict]:
                 url for url in t["reference_urls"]
                 if not url.startswith("http") or url_map.get(url, False)
             ]
-        # 新形式: URLが切れている参照テキストを除去
+        # references（dict/str 両対応）
         if "references" in t:
             valid_refs = []
             for ref in t["references"]:
-                urls_in_ref = URL_PATTERN.findall(ref)
-                if urls_in_ref:
-                    if all(url_map.get(u, False) for u in urls_in_ref):
+                url = _extract_url_from_ref(ref)
+                if url:
+                    # URLがある場合: 到達可能なら残す、不可なら URL を空にして残す
+                    if url_map.get(url, False):
                         valid_refs.append(ref)
+                    else:
+                        # URLが切れていてもテキスト参照は残す（URLだけ除去）
+                        if isinstance(ref, dict):
+                            valid_refs.append({"text": ref.get("text", ""), "url": ""})
+                        # str形式は除去
                 else:
-                    # URLを含まないテキスト参照はそのまま残す
+                    # URLなしの参照はそのまま残す
                     valid_refs.append(ref)
             t["references"] = valid_refs
 
