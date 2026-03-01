@@ -28,6 +28,7 @@ from weekly_aggregator import (
 )
 from url_validator import validate_trends
 from link_generator import enrich_references
+from notion_writer import save_to_notion
 
 logging.basicConfig(
     level=logging.INFO,
@@ -131,11 +132,17 @@ def run_daily():
         logger.error("配信に失敗しました。")
         sys.exit(1)
 
-    # Step 9: 配信履歴を更新
+    # Step 9: Notion データベースに保存
+    logger.info("Notion に保存中...")
+    notion_url = save_to_notion(analysis, "daily")
+    if notion_url:
+        logger.info("Notion 保存完了: %s", notion_url)
+
+    # Step 10: 配信履歴を更新
     if top_trends:
         save_history(history, top_trends)
 
-    # Step 10: 古いデータのクリーンアップ
+    # Step 11: 古いデータのクリーンアップ
     cleanup_old_reports()
 
     logger.info("=== 日報モード 完了 ===")
@@ -177,6 +184,12 @@ def run_weekly():
     if not success:
         logger.error("週報配信に失敗しました。")
         sys.exit(1)
+
+    # Step 7: Notion データベースに保存
+    logger.info("Notion に保存中...")
+    notion_url = save_to_notion(analysis, "weekly")
+    if notion_url:
+        logger.info("Notion 保存完了: %s", notion_url)
 
     logger.info("=== 週報モード 完了 ===")
 

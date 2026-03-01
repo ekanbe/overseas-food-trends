@@ -58,6 +58,9 @@ jobs:
           # LINE (フォールバック)
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          # Notion
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
         run: python src/main.py --mode ${{ github.event.inputs.mode || 'daily' }}
 
       - name: Commit data changes
