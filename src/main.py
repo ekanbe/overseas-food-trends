@@ -9,6 +9,7 @@ import argparse
 import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -29,6 +30,7 @@ from weekly_aggregator import (
 from url_validator import validate_trends
 from link_generator import enrich_references
 from notion_writer import save_to_notion
+from podcast_prep import generate_podcast_text, save_podcast_source
 
 logging.basicConfig(
     level=logging.INFO,
@@ -138,7 +140,12 @@ def run_daily():
     if notion_url:
         logger.info("Notion 保存完了: %s", notion_url)
 
-    # Step 10: 配信履歴を更新
+    # Step 10: NotebookLM 用テキスト生成
+    now = datetime.now(timezone(timedelta(hours=9)))
+    podcast_text = generate_podcast_text(analysis, "daily")
+    save_podcast_source(podcast_text, now.strftime("%Y-%m-%d"))
+
+    # Step 11: 配信履歴を更新
     if top_trends:
         save_history(history, top_trends)
 
@@ -190,6 +197,11 @@ def run_weekly():
     notion_url = save_to_notion(analysis, "weekly")
     if notion_url:
         logger.info("Notion 保存完了: %s", notion_url)
+
+    # Step 8: NotebookLM 用テキスト生成
+    now = datetime.now(timezone(timedelta(hours=9)))
+    podcast_text = generate_podcast_text(analysis, "weekly")
+    save_podcast_source(podcast_text, f"{now.strftime('%Y-%m-%d')}_weekly")
 
     logger.info("=== 週報モード 完了 ===")
 
