@@ -15,6 +15,9 @@ on:
           - daily
           - weekly
 
+permissions:
+  contents: write
+
 jobs:
   detect-trends:
     runs-on: ubuntu-latest
