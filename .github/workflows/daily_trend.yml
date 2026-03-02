@@ -2,8 +2,8 @@ name: Daily Food Trend Report
 
 on:
   schedule:
-    # 毎朝8時JST = UTC 23時（前日）
-    - cron: '0 23 * * 0-5'
+    # 毎朝4時JST = UTC 19時（前日）
+    - cron: '0 19 * * 0-5'
   workflow_dispatch:
     inputs:
       mode:
