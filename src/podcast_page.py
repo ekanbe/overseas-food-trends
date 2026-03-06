@@ -1,7 +1,7 @@
 """ポッドキャスト用画像付きまとめページ生成モジュール.
 
 Notion DBから日報ページを取得 → トレンドキーワード抽出 →
-Google Custom Search APIで画像検索 → 日付別HTMLページを生成。
+Pexels APIで画像検索 → 日付別HTMLページを生成。
 GitHub Pagesで配信し、ポッドキャスト聴取中に画像確認する用途。
 """
 
@@ -19,27 +19,36 @@ logger = logging.getLogger(__name__)
 JST = timezone(timedelta(hours=9))
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs" / "podcast"
 
-# Google Custom Search API
-GOOGLE_CSE_API_KEY = os.environ.get("GOOGLE_CSE_API_KEY", "")
-GOOGLE_CSE_ID = os.environ.get("GOOGLE_CSE_ID", "")
-
-
 # ────────────────────────────────────────────
 # 1. Notion からページ取得
 # ────────────────────────────────────────────
 
-def _get_notion_client():
-    """Notion クライアントを取得."""
-    token = os.environ.get("NOTION_TOKEN")
-    if not token:
-        logger.warning("NOTION_TOKEN が未設定")
-        return None
-    try:
-        from notion_client import Client
-        return Client(auth=token)
-    except ImportError:
-        logger.warning("notion-client がインストールされていません")
-        return None
+NOTION_API_BASE = "https://api.notion.com/v1"
+NOTION_VERSION = "2022-06-28"
+
+
+def _notion_request(method: str, path: str, body: dict | None = None) -> dict:
+    """Notion API に直接HTTPリクエストを送信."""
+    token = os.environ.get("NOTION_TOKEN", "")
+    url = f"{NOTION_API_BASE}/{path}"
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Notion-Version": NOTION_VERSION,
+        "Content-Type": "application/json",
+    }
+
+    data = json.dumps(body).encode() if body else None
+    req = urllib.request.Request(url, method=method, headers=headers, data=data)
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _format_database_id(db_id: str) -> str:
+    """ハイフンなし32文字ならUUID形式に変換."""
+    if len(db_id) == 32 and "-" not in db_id:
+        return f"{db_id[:8]}-{db_id[8:12]}-{db_id[12:16]}-{db_id[16:20]}-{db_id[20:]}"
+    return db_id
 
 
 def fetch_latest_daily_page(target_date: str | None = None) -> dict | None:
@@ -48,30 +57,32 @@ def fetch_latest_daily_page(target_date: str | None = None) -> dict | None:
     Returns:
         {"title": str, "date": str, "page_id": str, "blocks": list} or None
     """
-    client = _get_notion_client()
-    if not client:
+    token = os.environ.get("NOTION_TOKEN")
+    if not token:
+        logger.warning("NOTION_TOKEN が未設定")
         return None
 
-    database_id = os.environ.get("NOTION_DATABASE_ID")
+    database_id = os.environ.get("NOTION_DATABASE_ID", "")
     if not database_id:
         logger.warning("NOTION_DATABASE_ID が未設定")
         return None
+
+    database_id = _format_database_id(database_id)
 
     if not target_date:
         target_date = datetime.now(JST).strftime("%Y-%m-%d")
 
     try:
         # 日付フィルタで日報ページを検索
-        response = client.databases.query(
-            database_id=database_id,
-            filter={
+        response = _notion_request("POST", f"databases/{database_id}/query", {
+            "filter": {
                 "and": [
                     {"property": "日付", "date": {"equals": target_date}},
                     {"property": "種別", "select": {"equals": "日報"}},
                 ]
             },
-            page_size=1,
-        )
+            "page_size": 1,
+        })
 
         results = response.get("results", [])
         if not results:
@@ -87,7 +98,7 @@ def fetch_latest_daily_page(target_date: str | None = None) -> dict | None:
         title = title_arr[0]["plain_text"] if title_arr else f"日報 {target_date}"
 
         # ページのブロック（本文）を全取得
-        blocks = _fetch_all_blocks(client, page_id)
+        blocks = _fetch_all_blocks(page_id)
 
         return {
             "title": title,
@@ -101,15 +112,15 @@ def fetch_latest_daily_page(target_date: str | None = None) -> dict | None:
         return None
 
 
-def _fetch_all_blocks(client, block_id: str) -> list[dict]:
+def _fetch_all_blocks(block_id: str) -> list[dict]:
     """ページの全ブロックをページネーション対応で取得."""
     blocks = []
     cursor = None
     while True:
-        kwargs = {"block_id": block_id, "page_size": 100}
+        params = f"page_size=100"
         if cursor:
-            kwargs["start_cursor"] = cursor
-        resp = client.blocks.children.list(**kwargs)
+            params += f"&start_cursor={cursor}"
+        resp = _notion_request("GET", f"blocks/{block_id}/children?{params}")
         blocks.extend(resp.get("results", []))
         if not resp.get("has_more"):
             break
@@ -197,26 +208,25 @@ def _extract_plain_text(block_content: dict) -> str:
 
 
 # ────────────────────────────────────────────
-# 3. Google Custom Search API で画像検索
+# 3. Pexels API で画像検索
 # ────────────────────────────────────────────
 
 def search_images(keywords: list[dict], max_per_keyword: int = 3) -> list[dict]:
-    """キーワードごとに画像を検索.
+    """キーワードごとにPexelsで画像を検索.
 
     Returns:
         [{"name_en": str, "name_ja": str, "rank": int, "images": [{"url": str, "title": str, "source": str}]}]
     """
-    if not GOOGLE_CSE_API_KEY or not GOOGLE_CSE_ID:
-        logger.warning("Google CSE API キーが未設定。フォールバック画像を使用します")
+    api_key = os.environ.get("PEXELS_API_KEY", "")
+    if not api_key:
+        logger.warning("PEXELS_API_KEY が未設定。フォールバック画像を使用します")
         return _fallback_image_results(keywords)
 
     results = []
     for kw in keywords:
+        # 英語名をメインクエリにする（Pexelsは英語検索が強い）
         query = f"{kw['name_en']} food"
-        if kw.get("name_ja"):
-            query = f"{kw['name_en']} {kw['name_ja']} food"
-
-        images = _cse_image_search(query, max_per_keyword)
+        images = _pexels_search(api_key, query, max_per_keyword)
         results.append({
             "name_en": kw["name_en"],
             "name_ja": kw.get("name_ja", ""),
@@ -228,33 +238,32 @@ def search_images(keywords: list[dict], max_per_keyword: int = 3) -> list[dict]:
     return results
 
 
-def _cse_image_search(query: str, num: int = 3) -> list[dict]:
-    """Google Custom Search API で画像検索を実行."""
+def _pexels_search(api_key: str, query: str, num: int = 3) -> list[dict]:
+    """Pexels API で画像検索を実行."""
     try:
         params = urllib.parse.urlencode({
-            "key": GOOGLE_CSE_API_KEY,
-            "cx": GOOGLE_CSE_ID,
-            "q": query,
-            "searchType": "image",
-            "num": min(num, 10),
-            "safe": "active",
-            "imgSize": "large",
+            "query": query,
+            "per_page": min(num, 15),
+            "size": "medium",
         })
-        url = f"https://www.googleapis.com/customsearch/v1?{params}"
+        url = f"https://api.pexels.com/v1/search?{params}"
 
-        req = urllib.request.Request(url)
+        req = urllib.request.Request(url, headers={
+            "Authorization": api_key,
+            "User-Agent": "FoodTrendBot/1.0",
+        })
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode("utf-8"))
 
-        items = data.get("items", [])
+        photos = data.get("photos", [])
         return [
             {
-                "url": item.get("link", ""),
-                "title": item.get("title", ""),
-                "source": item.get("displayLink", ""),
-                "thumbnail": item.get("image", {}).get("thumbnailLink", ""),
+                "url": photo.get("src", {}).get("large", ""),
+                "title": photo.get("alt", "") or photo.get("photographer", ""),
+                "source": f"Pexels / {photo.get('photographer', '')}",
+                "page_url": photo.get("url", ""),
             }
-            for item in items
+            for photo in photos
         ]
 
     except Exception as e:

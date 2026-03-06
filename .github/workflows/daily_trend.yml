@@ -70,9 +70,8 @@ jobs:
           # Notion
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
-          # Google Custom Search (ポッドキャスト画像)
-          GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
-          GOOGLE_CSE_ID: ${{ secrets.GOOGLE_CSE_ID }}
+          # Pexels (ポッドキャスト画像)
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: python src/main.py --mode ${{ github.event.inputs.mode || 'daily' }}
 
       - name: Commit data and pages
