@@ -31,6 +31,7 @@ from url_validator import validate_trends
 from link_generator import enrich_references
 from notion_writer import save_to_notion
 from podcast_prep import generate_podcast_text, save_podcast_source
+from podcast_page import run as run_podcast_page
 
 logging.basicConfig(
     level=logging.INFO,
@@ -149,7 +150,16 @@ def run_daily():
     if top_trends:
         save_history(history, top_trends)
 
-    # Step 11: 古いデータのクリーンアップ
+    # Step 12: ポッドキャスト画像ページ生成
+    logger.info("ポッドキャスト画像ページを生成中...")
+    try:
+        page_path = run_podcast_page(now.strftime("%Y-%m-%d"))
+        if page_path:
+            logger.info("ポッドキャスト画像ページ生成完了: %s", page_path)
+    except Exception as e:
+        logger.warning("ポッドキャスト画像ページ生成失敗（続行）: %s", e)
+
+    # Step 13: 古いデータのクリーンアップ
     cleanup_old_reports()
 
     logger.info("=== 日報モード 完了 ===")
