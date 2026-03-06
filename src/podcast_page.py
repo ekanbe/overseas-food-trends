@@ -211,8 +211,23 @@ def _extract_plain_text(block_content: dict) -> str:
 # 3. Pexels API で画像検索
 # ────────────────────────────────────────────
 
+def _is_searchable_keyword(kw: dict) -> bool:
+    """画像検索に適したキーワードか判定.
+
+    英語の食品名・料理名が含まれるものは画像検索向き。
+    日本語のみの抽象的なヘッドラインは不向き。
+    """
+    name = kw.get("name_en", "")
+    # ASCII英字が含まれていれば具体的な食品名の可能性が高い
+    has_english = bool(re.search(r"[a-zA-Z]{3,}", name))
+    return has_english
+
+
 def search_images(keywords: list[dict], max_per_keyword: int = 3) -> list[dict]:
     """キーワードごとにPexelsで画像を検索.
+
+    具体的な食品名（英語名あり）のみ画像検索し、
+    抽象的なキーワードはGoogle画像検索リンクにフォールバック。
 
     Returns:
         [{"name_en": str, "name_ja": str, "rank": int, "images": [{"url": str, "title": str, "source": str}]}]
@@ -224,16 +239,28 @@ def search_images(keywords: list[dict], max_per_keyword: int = 3) -> list[dict]:
 
     results = []
     for kw in keywords:
-        # 英語名をメインクエリにする（Pexelsは英語検索が強い）
-        query = f"{kw['name_en']} food"
-        images = _pexels_search(api_key, query, max_per_keyword)
-        results.append({
-            "name_en": kw["name_en"],
-            "name_ja": kw.get("name_ja", ""),
-            "rank": kw.get("rank", 0),
-            "context": kw.get("context", ""),
-            "images": images,
-        })
+        if _is_searchable_keyword(kw):
+            query = f"{kw['name_en']} food"
+            images = _pexels_search(api_key, query, max_per_keyword)
+            results.append({
+                "name_en": kw["name_en"],
+                "name_ja": kw.get("name_ja", ""),
+                "rank": kw.get("rank", 0),
+                "context": kw.get("context", ""),
+                "images": images,
+            })
+        else:
+            # 抽象的なキーワードはGoogle画像検索リンクのみ
+            query = kw["name_en"]
+            search_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&tbm=isch"
+            results.append({
+                "name_en": kw["name_en"],
+                "name_ja": kw.get("name_ja", ""),
+                "rank": kw.get("rank", 0),
+                "context": kw.get("context", ""),
+                "images": [],
+                "search_url": search_url,
+            })
 
     return results
 
