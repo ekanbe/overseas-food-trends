@@ -38,10 +38,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Write private key file
-        run: |
-          echo "${{ secrets.LINEWORKS_PRIVATE_KEY }}" > /tmp/lineworks_private.key
-
       - name: Run trend detection
         env:
           # Gemini AI
@@ -57,14 +53,7 @@ jobs:
           # Naver
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
-          # LINE Works
-          LINEWORKS_BOT_ID: ${{ secrets.LINEWORKS_BOT_ID }}
-          LINEWORKS_CLIENT_ID: ${{ secrets.LINEWORKS_CLIENT_ID }}
-          LINEWORKS_CLIENT_SECRET: ${{ secrets.LINEWORKS_CLIENT_SECRET }}
-          LINEWORKS_SERVICE_ACCOUNT: ${{ secrets.LINEWORKS_SERVICE_ACCOUNT }}
-          LINEWORKS_PRIVATE_KEY: /tmp/lineworks_private.key
-          LINEWORKS_USER_ID: ${{ secrets.LINEWORKS_USER_ID }}
-          # LINE (フォールバック)
+          # LINE
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
           # Notion

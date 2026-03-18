@@ -1,4 +1,4 @@
-"""海外フードトレンド自動検出 & LINE Works配信 — メインオーケストレーター.
+"""海外フードトレンド自動検出 & LINE配信 — メインオーケストレーター.
 
 モード:
   daily  — 日報（毎朝8時配信）: 全ソースからデータ収集→Gemini分析→レポート生成→配信
@@ -128,8 +128,8 @@ def run_daily():
     report_text = format_daily_report(analysis)
     logger.info("日報レポート生成完了（%d 文字）", len(report_text))
 
-    # Step 8: LINE Works配信
-    logger.info("LINE Works配信を開始...")
+    # Step 8: LINE配信
+    logger.info("LINE配信を開始...")
     success = send(report_text)
     if not success:
         logger.error("配信に失敗しました。")
@@ -195,8 +195,8 @@ def run_weekly():
     report_text = format_weekly_report(analysis, week_number, date_range)
     logger.info("週報レポート生成完了（%d 文字）", len(report_text))
 
-    # Step 6: LINE Works配信
-    logger.info("LINE Works配信を開始...")
+    # Step 6: LINE配信
+    logger.info("LINE配信を開始...")
     success = send(report_text)
     if not success:
         logger.error("週報配信に失敗しました。")
